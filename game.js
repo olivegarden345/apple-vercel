@@ -15,8 +15,11 @@ class FruitBoxGame {
             this.socket = io(socketUrl, {
                 transports: ['websocket', 'polling'],
                 reconnection: true,
-                reconnectionAttempts: 5,
-                reconnectionDelay: 1000
+                reconnectionAttempts: Infinity,
+                reconnectionDelay: 1000,
+                reconnectionDelayMax: 5000,
+                timeout: 20000,
+                forceNew: false
             });
         }
         this.roomId = null;
@@ -91,16 +94,50 @@ class FruitBoxGame {
         // Connection status
         this.socket.on('connect', () => {
             console.log('Connected to server');
+            // If we were in a game, try to rejoin
+            if (this.roomId && this.playerNumber) {
+                console.log('Reconnected - attempting to rejoin room:', this.roomId);
+                // The server should handle reconnection, but we can emit a rejoin event if needed
+            }
         });
         
-        this.socket.on('disconnect', () => {
-            console.log('Disconnected from server');
-            alert('Disconnected from server. Please refresh the page.');
+        this.socket.on('disconnect', (reason) => {
+            console.log('Disconnected from server. Reason:', reason);
+            // Only show alert if it's not a manual disconnect or if we're in an active game
+            if (this.gameActive && reason !== 'io client disconnect') {
+                console.warn('Unexpected disconnect during game. Attempting to reconnect...');
+                // Don't show alert immediately - let reconnection handle it
+            }
+        });
+        
+        this.socket.on('reconnect', (attemptNumber) => {
+            console.log('Reconnected to server after', attemptNumber, 'attempts');
+            // If we were in a game, we might need to rejoin
+            if (this.roomId && this.playerNumber && !this.gameActive) {
+                // Try to rejoin the room
+                this.socket.emit('join-room', this.roomId);
+            }
+        });
+        
+        this.socket.on('reconnect_attempt', (attemptNumber) => {
+            console.log('Reconnection attempt', attemptNumber);
+        });
+        
+        this.socket.on('reconnect_error', (error) => {
+            console.error('Reconnection error:', error);
+        });
+        
+        this.socket.on('reconnect_failed', () => {
+            console.error('Failed to reconnect to server');
+            alert('Lost connection to server and could not reconnect. Please refresh the page.');
         });
         
         this.socket.on('connect_error', (error) => {
             console.error('Connection error:', error);
-            alert('Cannot connect to server. Make sure the server is running on port 3000.\n\nTo start the server, run:\nnpm install\nnpm start');
+            // Don't show alert on initial connection error if we're in zen mode
+            if (!this.zenMode) {
+                alert('Cannot connect to server. Make sure the server is running on port 3000.\n\nTo start the server, run:\nnpm install\nnpm start');
+            }
         });
         
         this.socket.on('room-created', (roomId) => {

@@ -9,11 +9,19 @@ const io = socketIo(server, {
     cors: {
         origin: "*",
         methods: ["GET", "POST"]
-    }
+    },
+    pingTimeout: 60000,
+    pingInterval: 25000,
+    transports: ['websocket', 'polling']
 });
 
 // Serve static files
 app.use(express.static(path.join(__dirname)));
+
+// Health check endpoint to keep server alive
+app.get('/health', (req, res) => {
+    res.status(200).json({ status: 'ok', timestamp: Date.now() });
+});
 
 // Explicit route handler for root path
 app.get('/', (req, res) => {
