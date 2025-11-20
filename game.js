@@ -33,6 +33,8 @@ class FruitBoxGame {
         this.finished = false;
         this.opponentFinished = false;
         this.opponentScore = 0;
+        this.zenMode = false;
+        this.refillInterval = null;
         
         this.initializeElements();
         this.attachEventListeners();
@@ -47,6 +49,7 @@ class FruitBoxGame {
         this.indicator1 = document.getElementById('indicator1');
         this.indicator2 = document.getElementById('indicator2');
         this.startBtn = document.getElementById('startBtn');
+        this.exitZenModeBtn = document.getElementById('exitZenModeBtn');
         this.gameOverModal = document.getElementById('gameOverModal');
         this.winnerMessage = document.getElementById('winnerMessage');
         this.playAgainBtn = document.getElementById('playAgainBtn');
@@ -54,6 +57,7 @@ class FruitBoxGame {
         this.gameWrapper = document.querySelector('.game-wrapper');
         
         // Lobby elements
+        this.zenModeBtn = document.getElementById('zenModeBtn');
         this.createRoomBtn = document.getElementById('createRoomBtn');
         this.joinRoomBtn = document.getElementById('joinRoomBtn');
         this.roomIdInput = document.getElementById('roomIdInput');
@@ -278,6 +282,11 @@ class FruitBoxGame {
     }
     
     attachEventListeners() {
+        this.zenModeBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            this.startZenMode();
+        });
+        
         this.createRoomBtn.addEventListener('click', (e) => {
             e.preventDefault();
             console.log('Create Room button clicked');
@@ -355,6 +364,12 @@ class FruitBoxGame {
             }
         });
         
+        this.exitZenModeBtn.addEventListener('click', () => {
+            if (this.zenMode) {
+                this.resetToLobby();
+            }
+        });
+        
         this.playAgainBtn.addEventListener('click', () => {
             if (this.roomId && this.playerNumber) {
                 // Emit play-again request to server
@@ -413,6 +428,85 @@ class FruitBoxGame {
             e.preventDefault();
             this.handleMouseUp(e);
         });
+    }
+    
+    generateBoard() {
+        const board = [];
+        for (let row = 0; row < this.ROWS; row++) {
+            board[row] = [];
+            for (let col = 0; col < this.COLS; col++) {
+                board[row][col] = {
+                    value: Math.floor(Math.random() * 9) + 1,
+                    cleared: false
+                };
+            }
+        }
+        return board;
+    }
+    
+    startZenMode() {
+        this.zenMode = true;
+        this.gameActive = true;
+        this.finished = false;
+        this.score = 0;
+        this.board = this.generateBoard();
+        
+        // Hide lobby
+        this.lobbyModal.classList.remove('show');
+        this.gameWrapper.style.display = 'flex';
+        
+        // Hide score and timer displays
+        this.score1El.parentElement.parentElement.style.display = 'none';
+        this.score2El.parentElement.parentElement.style.display = 'none';
+        this.timerEl.parentElement.style.display = 'none';
+        this.indicator1.style.display = 'none';
+        this.indicator2.style.display = 'none';
+        this.startBtn.style.display = 'none';
+        this.roomDisplay.style.display = 'none';
+        this.exitZenModeBtn.style.display = 'block';
+        
+        // Render the board
+        this.renderBoard();
+        
+        console.log('Zen mode started');
+    }
+    
+    checkAndRefillIfNeeded() {
+        // Count cleared cells
+        let clearedCount = 0;
+        for (let row = 0; row < this.ROWS; row++) {
+            for (let col = 0; col < this.COLS; col++) {
+                if (this.board[row][col].cleared) {
+                    clearedCount++;
+                }
+            }
+        }
+        
+        // Refill if there are at least 50 cleared cells
+        if (clearedCount >= 50) {
+            this.refillClearedCells();
+        }
+    }
+    
+    refillClearedCells() {
+        let refilledCount = 0;
+        for (let row = 0; row < this.ROWS; row++) {
+            for (let col = 0; col < this.COLS; col++) {
+                if (this.board[row][col].cleared) {
+                    // Refill with new random number
+                    this.board[row][col].value = Math.floor(Math.random() * 9) + 1;
+                    this.board[row][col].cleared = false;
+                    refilledCount++;
+                }
+            }
+        }
+        
+        // Re-render the board to show refilled cells
+        this.renderBoard();
+        
+        if (refilledCount > 0) {
+            console.log(`Refilled ${refilledCount} cells`);
+        }
     }
     
     renderBoard() {
@@ -604,18 +698,55 @@ class FruitBoxGame {
         this.isSelecting = false;
         this.selectionEnd = null;
         
-        if (this.selectedCells.size > 0 && this.roomId && this.playerNumber) {
+        if (this.selectedCells.size > 0) {
             const cells = Array.from(this.selectedCells).map(key => {
                 const [row, col] = key.split(',').map(Number);
                 return { row, col };
             });
-            this.socket.emit('select-cells', {
-                roomId: this.roomId,
-                cells: cells,
-                playerNumber: this.playerNumber
-            });
+            
+            if (this.zenMode) {
+                // Handle selection in zen mode (client-side only)
+                this.handleZenModeSelection(cells);
+            } else if (this.roomId && this.playerNumber) {
+                // Handle selection in multiplayer mode (via socket)
+                this.socket.emit('select-cells', {
+                    roomId: this.roomId,
+                    cells: cells,
+                    playerNumber: this.playerNumber
+                });
+            }
         }
         this.clearSelection();
+    }
+    
+    handleZenModeSelection(cells) {
+        // Calculate sum
+        let sum = 0;
+        const selectedIndices = [];
+        
+        cells.forEach(({ row, col }) => {
+            const cellData = this.board[row][col];
+            if (!cellData.cleared) {
+                sum += cellData.value;
+                selectedIndices.push({ row, col });
+            }
+        });
+        
+        // If sum equals 10, clear the cells
+        if (sum === 10 && selectedIndices.length > 0) {
+            selectedIndices.forEach(({ row, col }) => {
+                this.board[row][col].cleared = true;
+            });
+            
+            // Re-render the board to show cleared cells
+            this.renderBoard();
+            
+            // Check if we need to refill (at least 50 cleared cells)
+            this.checkAndRefillIfNeeded();
+        } else {
+            // Invalid selection - show feedback
+            this.showInvalidSelection();
+        }
     }
     
     cancelSelection() {
@@ -773,9 +904,16 @@ class FruitBoxGame {
     }
     
     resetToLobby() {
+        // Clear zen mode interval if active (no longer needed, but keeping for cleanup)
+        if (this.refillInterval) {
+            clearInterval(this.refillInterval);
+            this.refillInterval = null;
+        }
+        
         this.gameActive = false;
         this.finished = false;
         this.opponentFinished = false;
+        this.zenMode = false;
         this.board = [];
         this.score = 0;
         this.opponentScore = 0;
@@ -793,6 +931,14 @@ class FruitBoxGame {
         this.roomIdInput.value = '';
         this.timerEl.textContent = '120';
         this.timerEl.classList.remove('warning');
+        
+        // Show score and timer displays again (in case they were hidden in zen mode)
+        this.score1El.parentElement.parentElement.style.display = '';
+        this.score2El.parentElement.parentElement.style.display = '';
+        this.timerEl.parentElement.style.display = '';
+        this.indicator1.style.display = '';
+        this.indicator2.style.display = '';
+        this.exitZenModeBtn.style.display = 'none';
     }
 }
 
