@@ -63,6 +63,18 @@ class FruitBoxGame {
         this.waitingText = document.getElementById('waitingText');
         this.currentRoomId = document.getElementById('currentRoomId');
         this.roomDisplay = document.getElementById('roomDisplay');
+        
+        // Debug: Check if buttons exist
+        if (!this.createRoomBtn) {
+            console.error('Create Room button not found!');
+        }
+        if (!this.joinRoomBtn) {
+            console.error('Join Room button not found!');
+        }
+        console.log('Elements initialized:', {
+            createRoomBtn: !!this.createRoomBtn,
+            joinRoomBtn: !!this.joinRoomBtn
+        });
     }
     
     setupSocketListeners() {
@@ -200,30 +212,50 @@ class FruitBoxGame {
     }
     
     attachEventListeners() {
-        this.createRoomBtn.addEventListener('click', () => {
+        this.createRoomBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            console.log('Create Room button clicked');
+            console.log('Socket state:', {
+                socket: this.socket,
+                connected: this.socket?.connected,
+                ioAvailable: typeof io !== 'undefined'
+            });
+            
             if (!this.socket) {
-                alert('Socket.io not loaded. Please refresh the page and make sure the server is running.');
-                console.error('Socket is null');
+                const errorMsg = 'Socket.io not loaded. Please refresh the page and make sure the server is running.';
+                console.error('Socket is null', errorMsg);
+                alert(errorMsg);
                 return;
             }
             if (!this.socket.connected) {
-                alert('Not connected to server. Please make sure the server is running.');
-                console.error('Socket not connected');
+                const errorMsg = 'Not connected to server. Please make sure the server is running.';
+                console.error('Socket not connected', errorMsg);
+                alert(errorMsg);
                 return;
             }
             console.log('Creating room...');
             this.socket.emit('create-room');
         });
         
-        this.joinRoomBtn.addEventListener('click', () => {
+        this.joinRoomBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            console.log('Join Room button clicked');
+            console.log('Socket state:', {
+                socket: this.socket,
+                connected: this.socket?.connected,
+                ioAvailable: typeof io !== 'undefined'
+            });
+            
             if (!this.socket) {
-                alert('Socket.io not loaded. Please refresh the page and make sure the server is running.');
-                console.error('Socket is null');
+                const errorMsg = 'Socket.io not loaded. Please refresh the page and make sure the server is running.';
+                console.error('Socket is null', errorMsg);
+                alert(errorMsg);
                 return;
             }
             if (!this.socket.connected) {
-                alert('Not connected to server. Please make sure the server is running.');
-                console.error('Socket not connected');
+                const errorMsg = 'Not connected to server. Please make sure the server is running.';
+                console.error('Socket not connected', errorMsg);
+                alert(errorMsg);
                 return;
             }
             const roomId = this.roomIdInput.value.trim().toUpperCase();
@@ -619,26 +651,28 @@ class FruitBoxGame {
 }
 
 // Initialize game when page loads
+console.log('game.js loaded, waiting for DOM...');
 document.addEventListener('DOMContentLoaded', () => {
+    console.log('DOM loaded, initializing game...');
+    
     // Wait a bit for socket.io to load if it's loading from CDN
     function initGame() {
-        if (typeof io === 'undefined') {
-            console.warn('Socket.io not loaded yet, waiting...');
-            setTimeout(initGame, 100);
-            return;
-        }
+        console.log('Initializing game, io available:', typeof io !== 'undefined');
         try {
-            new FruitBoxGame();
+            window.gameInstance = new FruitBoxGame();
+            console.log('Game initialized successfully');
         } catch (error) {
             console.error('Error initializing game:', error);
-            alert('Error initializing game. Please check the console for details.');
+            alert('Error initializing game: ' + error.message + '\n\nPlease check the console for details.');
         }
     }
     
     // Try to initialize immediately, or wait if socket.io isn't ready
     if (typeof io !== 'undefined') {
+        console.log('Socket.io already available, initializing immediately');
         initGame();
     } else {
+        console.log('Socket.io not available, waiting...');
         // Wait up to 3 seconds for socket.io to load
         let attempts = 0;
         const maxAttempts = 30;
@@ -646,15 +680,19 @@ document.addEventListener('DOMContentLoaded', () => {
             attempts++;
             if (typeof io !== 'undefined') {
                 clearInterval(checkInterval);
+                console.log('Socket.io loaded after', attempts * 100, 'ms');
                 initGame();
             } else if (attempts >= maxAttempts) {
                 clearInterval(checkInterval);
                 console.error('Socket.io failed to load after 3 seconds');
+                console.log('Initializing game anyway (buttons will show connection errors)');
                 // Initialize anyway so buttons at least show error messages
                 try {
-                    new FruitBoxGame();
+                    window.gameInstance = new FruitBoxGame();
+                    console.log('Game initialized without socket.io');
                 } catch (error) {
                     console.error('Error initializing game:', error);
+                    alert('Error initializing game: ' + error.message);
                 }
             }
         }, 100);
