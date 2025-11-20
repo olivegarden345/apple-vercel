@@ -33,8 +33,25 @@ Railway will automatically:
 
 1. Go to https://railway.app
 2. Open your project "courageious-determination"
-3. Check the "Deployments" tab to see deployment status
-4. View logs if there are any issues
+3. Check the **Logs** tab to see deployment status and real-time logs
+4. View any errors in the logs
+
+## Generate a Public Domain
+
+To make your app accessible on the internet:
+
+1. Go to your service in Railway
+2. Click on the **Settings** tab
+3. Scroll down to **Networking** → **Public Networking**
+4. Click **Generate Domain**
+5. Railway will create a public URL like `your-app.up.railway.app`
+
+**Note:** If Railway detects your service is listening correctly, you may see an automated prompt on the service tile to generate a domain - just follow the prompts!
+
+If you don't see the "Generate Domain" button:
+- Make sure your service is deployed and running
+- Check that there's no TCP Proxy configured (remove it if there is)
+- Verify your server is listening on `0.0.0.0:$PORT` (already configured in server.js)
 
 ## Important Notes
 
