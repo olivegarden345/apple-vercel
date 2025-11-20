@@ -53,13 +53,15 @@ io.on('connection', (socket) => {
         socket.join(roomId);
         socket.emit('room-created', roomId);
         
-        // Initialize game state
+        // Initialize game state with shared board
+        const sharedBoard = generateBoard();
         games.set(roomId, {
             roomId,
             players: [{ id: socket.id, playerNumber: 1 }],
+            sharedBoard: sharedBoard, // One board for both players
             playerGames: {
-                1: { board: null, score: 0, timeRemaining: 60, gameActive: false, finished: false, timerInterval: null },
-                2: { board: null, score: 0, timeRemaining: 60, gameActive: false, finished: false, timerInterval: null }
+                1: { board: null, score: 0, timeRemaining: 120, gameActive: false, finished: false, timerInterval: null },
+                2: { board: null, score: 0, timeRemaining: 120, gameActive: false, finished: false, timerInterval: null }
             },
             playerCount: 1,
             bothFinished: false
@@ -107,12 +109,13 @@ io.on('connection', (socket) => {
             return; // Already started
         }
         
-        // Generate individual board for this player
-        const board = generateBoard();
+        // Use the shared board for this player (both players get the same board)
+        // Deep clone the board so each player's cleared state is independent
+        const board = JSON.parse(JSON.stringify(game.sharedBoard));
         playerGame.board = board;
         playerGame.gameActive = true;
         playerGame.score = 0;
-        playerGame.timeRemaining = 60;
+        playerGame.timeRemaining = 120;
         playerGame.finished = false;
         
         // Send game started to this player only

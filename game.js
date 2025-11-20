@@ -152,7 +152,7 @@ class FruitBoxGame {
             this.finished = false;
             this.opponentFinished = false;
             this.score = 0;
-            this.timeRemaining = 60;
+            this.timeRemaining = 120;
             this.startBtn.style.display = 'none';
             this.renderBoard();
             this.updateScores();
@@ -645,7 +645,7 @@ class FruitBoxGame {
         this.roomInfo.style.display = 'none';
         this.roomDisplay.style.display = 'none';
         this.roomIdInput.value = '';
-        this.timerEl.textContent = '60';
+        this.timerEl.textContent = '120';
         this.timerEl.classList.remove('warning');
     }
 }

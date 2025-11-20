@@ -157,7 +157,7 @@ body {
 }
 
 .cell {
-    background: #fff;
+    background: transparent;
     background-image: url('apple-icon.png');
     background-size: contain;
     background-position: center;
