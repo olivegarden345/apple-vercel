@@ -9,7 +9,15 @@ class FruitBoxGame {
             console.error('Socket.io not loaded! Make sure the server is running.');
             this.socket = null;
         } else {
-            this.socket = io();
+            // Initialize socket.io - use current origin for connection
+            const socketUrl = window.location.origin;
+            console.log('Connecting to socket.io at:', socketUrl);
+            this.socket = io(socketUrl, {
+                transports: ['websocket', 'polling'],
+                reconnection: true,
+                reconnectionAttempts: 5,
+                reconnectionDelay: 1000
+            });
         }
         this.roomId = null;
         this.playerNumber = null;
@@ -193,8 +201,14 @@ class FruitBoxGame {
     
     attachEventListeners() {
         this.createRoomBtn.addEventListener('click', () => {
-            if (!this.socket || !this.socket.connected) {
+            if (!this.socket) {
+                alert('Socket.io not loaded. Please refresh the page and make sure the server is running.');
+                console.error('Socket is null');
+                return;
+            }
+            if (!this.socket.connected) {
                 alert('Not connected to server. Please make sure the server is running.');
+                console.error('Socket not connected');
                 return;
             }
             console.log('Creating room...');
@@ -202,8 +216,14 @@ class FruitBoxGame {
         });
         
         this.joinRoomBtn.addEventListener('click', () => {
-            if (!this.socket || !this.socket.connected) {
+            if (!this.socket) {
+                alert('Socket.io not loaded. Please refresh the page and make sure the server is running.');
+                console.error('Socket is null');
+                return;
+            }
+            if (!this.socket.connected) {
                 alert('Not connected to server. Please make sure the server is running.');
+                console.error('Socket not connected');
                 return;
             }
             const roomId = this.roomIdInput.value.trim().toUpperCase();
@@ -600,5 +620,43 @@ class FruitBoxGame {
 
 // Initialize game when page loads
 document.addEventListener('DOMContentLoaded', () => {
-    new FruitBoxGame();
+    // Wait a bit for socket.io to load if it's loading from CDN
+    function initGame() {
+        if (typeof io === 'undefined') {
+            console.warn('Socket.io not loaded yet, waiting...');
+            setTimeout(initGame, 100);
+            return;
+        }
+        try {
+            new FruitBoxGame();
+        } catch (error) {
+            console.error('Error initializing game:', error);
+            alert('Error initializing game. Please check the console for details.');
+        }
+    }
+    
+    // Try to initialize immediately, or wait if socket.io isn't ready
+    if (typeof io !== 'undefined') {
+        initGame();
+    } else {
+        // Wait up to 3 seconds for socket.io to load
+        let attempts = 0;
+        const maxAttempts = 30;
+        const checkInterval = setInterval(() => {
+            attempts++;
+            if (typeof io !== 'undefined') {
+                clearInterval(checkInterval);
+                initGame();
+            } else if (attempts >= maxAttempts) {
+                clearInterval(checkInterval);
+                console.error('Socket.io failed to load after 3 seconds');
+                // Initialize anyway so buttons at least show error messages
+                try {
+                    new FruitBoxGame();
+                } catch (error) {
+                    console.error('Error initializing game:', error);
+                }
+            }
+        }, 100);
+    }
 });

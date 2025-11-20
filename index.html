@@ -5,7 +5,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Multiplayer Fruit Box</title>
     <link rel="stylesheet" href="style.css">
-    <script src="/socket.io/socket.io.js"></script>
+    <script src="/socket.io/socket.io.js" onerror="loadSocketIOCDN(this)"></script>
+    <script>
+        function loadSocketIOCDN(script) {
+            console.warn('Failed to load socket.io from server, trying CDN...');
+            const cdnScript = document.createElement('script');
+            cdnScript.src = 'https://cdn.socket.io/4.6.1/socket.io.min.js';
+            cdnScript.onload = function() {
+                console.log('Socket.io loaded from CDN');
+            };
+            cdnScript.onerror = function() {
+                console.error('Failed to load socket.io from CDN as well');
+            };
+            document.head.appendChild(cdnScript);
+        }
+    </script>
 </head>
 <body>
     <div id="lobbyModal" class="modal show">
