@@ -181,6 +181,14 @@ class FruitBoxGame {
             }
         });
         
+        this.socket.on('opponent-score-update', ({ score, playerNumber }) => {
+            // Update opponent's score in real-time
+            if (playerNumber !== this.playerNumber) {
+                this.opponentScore = score;
+                this.updateScores();
+            }
+        });
+        
         this.socket.on('invalid-selection', () => {
             this.showInvalidSelection();
         });
@@ -709,13 +717,19 @@ class FruitBoxGame {
     updateScores() {
         if (this.playerNumber === 1) {
             this.score1El.textContent = this.score;
-            if (this.opponentFinished) {
+            // Always show opponent's score if we have it (real-time updates)
+            if (this.opponentScore !== undefined && this.opponentScore !== null) {
                 this.score2El.textContent = this.opponentScore;
+            } else {
+                this.score2El.textContent = '0';
             }
         } else {
             this.score2El.textContent = this.score;
-            if (this.opponentFinished) {
+            // Always show opponent's score if we have it (real-time updates)
+            if (this.opponentScore !== undefined && this.opponentScore !== null) {
                 this.score1El.textContent = this.opponentScore;
+            } else {
+                this.score1El.textContent = '0';
             }
         }
     }

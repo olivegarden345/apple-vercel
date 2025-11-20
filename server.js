@@ -215,12 +215,22 @@ io.on('connection', (socket) => {
             
             playerGame.score += clearedCount;
             
-            // Send update to this player only
+            // Send update to this player
             socket.emit('cells-cleared', {
                 cells: selectedIndices,
                 score: playerGame.score,
                 playerNumber: playerNumber
             });
+            
+            // Send score update to the opponent so they can see it in real-time
+            const otherPlayerNumber = playerNumber === 1 ? 2 : 1;
+            const otherPlayer = game.players.find(p => p.playerNumber === otherPlayerNumber);
+            if (otherPlayer) {
+                io.to(otherPlayer.id).emit('opponent-score-update', {
+                    score: playerGame.score,
+                    playerNumber: playerNumber
+                });
+            }
         } else {
             // Invalid selection
             socket.emit('invalid-selection');
