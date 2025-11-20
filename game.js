@@ -24,10 +24,11 @@ class FruitBoxGame {
         this.board = [];
         this.selectedCells = new Set();
         this.score = 0;
-        this.timeRemaining = 60;
+        this.timeRemaining = 120;
         this.gameActive = false;
         this.isSelecting = false;
         this.selectionStart = null;
+        this.selectionEnd = null;
         this.selectionBox = null;
         this.finished = false;
         this.opponentFinished = false;
@@ -367,59 +368,64 @@ class FruitBoxGame {
     handleMouseDown(e) {
         if (!this.gameActive || this.finished) return;
         
-        // Allow starting selection on the game board itself (negative space)
-        const cell = e.target.closest('.cell');
-        if (cell && cell.classList.contains('cleared')) return;
-        
+        // Allow starting selection anywhere, including cleared cells and negative space
         e.preventDefault();
         e.stopPropagation();
         this.isSelecting = true;
         
-        // Get the cell index, prefer position-based calculation for better accuracy
-        let index = this.getCellFromPosition(e);
-        
-        // Fallback to cell-based if position calculation fails
-        if (!index && cell && !cell.classList.contains('cleared')) {
-            index = this.getCellIndex(cell);
-        }
-        
-        // Also check if the clicked cell is valid
-        if (!index && cell && !cell.classList.contains('cleared')) {
-            index = this.getCellIndex(cell);
-        }
+        // Get the cell index from exact cursor position
+        const index = this.getCellFromPosition(e);
         
         if (index) {
             this.selectionStart = index;
             this.selectedCells.clear();
             this.createSelectionBox();
-            this.addToSelection(index);
-            this.updateSelectionBox();
+            // Initialize with the start cell (if not cleared) so box shows immediately
+            const cellData = this.board[index.row][index.col];
+            if (!cellData.cleared) {
+                this.addToSelection(index);
+            } else {
+                // Even if cleared, show the box at the start position
+                this.updateSelectionBox();
+            }
         }
     }
     
     handleMouseMove(e) {
         if (!this.isSelecting || !this.gameActive || this.finished) return;
         
-        // Calculate cell from mouse position
+        // Calculate cell from exact cursor position
         const index = this.getCellFromPosition(e);
         if (index && this.selectionStart) {
-            // Only update if the cell actually changed to reduce unnecessary updates
-            const currentEnd = Array.from(this.selectedCells).pop();
-            const newKey = `${index.row},${index.col}`;
-            if (currentEnd !== newKey) {
-                this.updateSelection(this.selectionStart, index);
-            }
+            this.selectionEnd = index;
+            // Update selection to include all cells in the box
+            this.updateSelection(this.selectionStart, index);
         }
     }
     
     getCellFromPosition(e) {
+        // First try to get the exact cell element under the cursor
+        const element = document.elementFromPoint(e.clientX, e.clientY);
+        if (element) {
+            // Check if it's a cell or inside a cell
+            const cell = element.closest('.cell');
+            if (cell && cell.dataset.row !== undefined) {
+                const row = parseInt(cell.dataset.row);
+                const col = parseInt(cell.dataset.col);
+                if (!isNaN(row) && !isNaN(col)) {
+                    return { row, col };
+                }
+            }
+        }
+        
+        // Fallback: calculate which cell the point falls into based on position
         const rect = this.gameBoard.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
         
         // Account for padding (2px) on game board
         const padding = 2;
-        const gap = 2; // gap between cells
+        const gap = 2;
         
         // Calculate available space (total minus padding)
         const availableWidth = rect.width - (padding * 2);
@@ -433,10 +439,10 @@ class FruitBoxGame {
         const adjustedX = x - padding;
         const adjustedY = y - padding;
         
-        // Calculate which cell, making it more forgiving
-        // Use Math.round for better sensitivity near cell edges
-        let col = Math.round(adjustedX / (cellWidth + gap));
-        let row = Math.round(adjustedY / (cellHeight + gap));
+        // Determine which cell contains this point
+        // Use floor to find the cell that contains the point
+        let col = Math.floor(adjustedX / (cellWidth + gap));
+        let row = Math.floor(adjustedY / (cellHeight + gap));
         
         // Clamp to valid range
         col = Math.max(0, Math.min(this.COLS - 1, col));
@@ -459,27 +465,36 @@ class FruitBoxGame {
             this.createSelectionBox();
         }
         
-        if (this.selectedCells.size === 0) {
+        // Determine box bounds from selection start and end
+        let minRow, maxRow, minCol, maxCol;
+        
+        if (this.selectionStart && this.selectionEnd) {
+            // Use start and end to show the full box being drawn
+            minRow = Math.min(this.selectionStart.row, this.selectionEnd.row);
+            maxRow = Math.max(this.selectionStart.row, this.selectionEnd.row);
+            minCol = Math.min(this.selectionStart.col, this.selectionEnd.col);
+            maxCol = Math.max(this.selectionStart.col, this.selectionEnd.col);
+        } else if (this.selectedCells.size > 0) {
+            // Fallback to selected cells if no end position yet
+            const cells = Array.from(this.selectedCells).map(key => {
+                const [row, col] = key.split(',').map(Number);
+                return { row, col };
+            });
+            
+            const rows = cells.map(c => c.row);
+            const cols = cells.map(c => c.col);
+            minRow = Math.min(...rows);
+            maxRow = Math.max(...rows);
+            minCol = Math.min(...cols);
+            maxCol = Math.max(...cols);
+        } else if (this.selectionStart) {
+            // If no cells selected but we have a start position, show box at start
+            minRow = maxRow = this.selectionStart.row;
+            minCol = maxCol = this.selectionStart.col;
+        } else {
             this.selectionBox.style.display = 'none';
             return;
         }
-        
-        const cells = Array.from(this.selectedCells).map(key => {
-            const [row, col] = key.split(',').map(Number);
-            return { row, col };
-        });
-        
-        if (cells.length === 0) {
-            this.selectionBox.style.display = 'none';
-            return;
-        }
-        
-        const rows = cells.map(c => c.row);
-        const cols = cells.map(c => c.col);
-        const minRow = Math.min(...rows);
-        const maxRow = Math.max(...rows);
-        const minCol = Math.min(...cols);
-        const maxCol = Math.max(...cols);
         
         const rect = this.gameBoard.getBoundingClientRect();
         const padding = 2;
@@ -509,6 +524,7 @@ class FruitBoxGame {
     handleMouseUp(e) {
         if (!this.isSelecting) return;
         this.isSelecting = false;
+        this.selectionEnd = null;
         
         if (this.selectedCells.size > 0 && this.roomId && this.playerNumber) {
             const cells = Array.from(this.selectedCells).map(key => {
@@ -551,11 +567,18 @@ class FruitBoxGame {
         const minCol = Math.min(start.col, end.col);
         const maxCol = Math.max(start.col, end.col);
         
+        // Select all cells in the box (only non-cleared ones)
         for (let row = minRow; row <= maxRow; row++) {
             for (let col = minCol; col <= maxCol; col++) {
                 const cellData = this.board[row][col];
                 if (!cellData.cleared) {
-                    this.addToSelection({ row, col });
+                    const key = `${row},${col}`;
+                    this.selectedCells.add(key);
+                    const cell = this.getCellElement(row, col);
+                    if (cell) {
+                        cell.classList.add('selected');
+                        cell.classList.add(`player${this.playerNumber}`);
+                    }
                 }
             }
         }
