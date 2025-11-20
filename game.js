@@ -310,18 +310,25 @@ class FruitBoxGame {
         this.gameBoard.addEventListener('touchstart', (e) => {
             e.preventDefault();
             const touch = e.touches[0];
-            const cell = document.elementFromPoint(touch.clientX, touch.clientY);
-            if (cell && cell.classList.contains('cell')) {
-                this.handleMouseDown({ target: cell, preventDefault: () => {} });
-            }
+            // Use position-based calculation for better accuracy
+            const fakeEvent = {
+                clientX: touch.clientX,
+                clientY: touch.clientY,
+                preventDefault: () => {},
+                stopPropagation: () => {},
+                target: e.target
+            };
+            this.handleMouseDown(fakeEvent);
         });
         this.gameBoard.addEventListener('touchmove', (e) => {
             e.preventDefault();
             const touch = e.touches[0];
-            const cell = document.elementFromPoint(touch.clientX, touch.clientY);
-            if (cell && cell.classList.contains('cell')) {
-                this.handleMouseMove({ target: cell });
-            }
+            // Use position-based calculation for better accuracy
+            const fakeEvent = {
+                clientX: touch.clientX,
+                clientY: touch.clientY
+            };
+            this.handleMouseMove(fakeEvent);
         });
         this.gameBoard.addEventListener('touchend', (e) => {
             e.preventDefault();
@@ -365,15 +372,20 @@ class FruitBoxGame {
         if (cell && cell.classList.contains('cleared')) return;
         
         e.preventDefault();
+        e.stopPropagation();
         this.isSelecting = true;
         
-        // Get the cell index, or calculate from mouse position
-        let index = null;
-        if (cell && !cell.classList.contains('cleared')) {
+        // Get the cell index, prefer position-based calculation for better accuracy
+        let index = this.getCellFromPosition(e);
+        
+        // Fallback to cell-based if position calculation fails
+        if (!index && cell && !cell.classList.contains('cleared')) {
             index = this.getCellIndex(cell);
-        } else {
-            // Calculate cell from mouse position on game board
-            index = this.getCellFromPosition(e);
+        }
+        
+        // Also check if the clicked cell is valid
+        if (!index && cell && !cell.classList.contains('cleared')) {
+            index = this.getCellIndex(cell);
         }
         
         if (index) {
@@ -391,7 +403,12 @@ class FruitBoxGame {
         // Calculate cell from mouse position
         const index = this.getCellFromPosition(e);
         if (index && this.selectionStart) {
-            this.updateSelection(this.selectionStart, index);
+            // Only update if the cell actually changed to reduce unnecessary updates
+            const currentEnd = Array.from(this.selectedCells).pop();
+            const newKey = `${index.row},${index.col}`;
+            if (currentEnd !== newKey) {
+                this.updateSelection(this.selectionStart, index);
+            }
         }
     }
     
@@ -400,18 +417,32 @@ class FruitBoxGame {
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
         
-        // Calculate which cell the mouse is over
-        const cellWidth = rect.width / this.COLS;
-        const cellHeight = rect.height / this.ROWS;
+        // Account for padding (2px) on game board
+        const padding = 2;
         const gap = 2; // gap between cells
         
-        const col = Math.floor((x + gap) / (cellWidth + gap));
-        const row = Math.floor((y + gap) / (cellHeight + gap));
+        // Calculate available space (total minus padding)
+        const availableWidth = rect.width - (padding * 2);
+        const availableHeight = rect.height - (padding * 2);
         
-        if (row >= 0 && row < this.ROWS && col >= 0 && col < this.COLS) {
-            return { row, col };
-        }
-        return null;
+        // Calculate cell dimensions including gap
+        const cellWidth = (availableWidth - (gap * (this.COLS - 1))) / this.COLS;
+        const cellHeight = (availableHeight - (gap * (this.ROWS - 1))) / this.ROWS;
+        
+        // Adjust coordinates to account for padding
+        const adjustedX = x - padding;
+        const adjustedY = y - padding;
+        
+        // Calculate which cell, making it more forgiving
+        // Use Math.round for better sensitivity near cell edges
+        let col = Math.round(adjustedX / (cellWidth + gap));
+        let row = Math.round(adjustedY / (cellHeight + gap));
+        
+        // Clamp to valid range
+        col = Math.max(0, Math.min(this.COLS - 1, col));
+        row = Math.max(0, Math.min(this.ROWS - 1, row));
+        
+        return { row, col };
     }
     
     createSelectionBox() {
@@ -451,12 +482,20 @@ class FruitBoxGame {
         const maxCol = Math.max(...cols);
         
         const rect = this.gameBoard.getBoundingClientRect();
-        const cellWidth = (rect.width - (this.COLS + 1) * 2) / this.COLS;
-        const cellHeight = (rect.height - (this.ROWS + 1) * 2) / this.ROWS;
+        const padding = 2;
         const gap = 2;
         
-        const left = minCol * (cellWidth + gap) + gap + 2; // +2 for padding
-        const top = minRow * (cellHeight + gap) + gap + 2; // +2 for padding
+        // Calculate available space (total minus padding)
+        const availableWidth = rect.width - (padding * 2);
+        const availableHeight = rect.height - (padding * 2);
+        
+        // Calculate cell dimensions including gap
+        const cellWidth = (availableWidth - (gap * (this.COLS - 1))) / this.COLS;
+        const cellHeight = (availableHeight - (gap * (this.ROWS - 1))) / this.ROWS;
+        
+        // Calculate position accounting for padding
+        const left = padding + minCol * (cellWidth + gap);
+        const top = padding + minRow * (cellHeight + gap);
         const width = (maxCol - minCol + 1) * cellWidth + (maxCol - minCol) * gap;
         const height = (maxRow - minRow + 1) * cellHeight + (maxRow - minRow) * gap;
         
