@@ -167,7 +167,7 @@ body {
     align-items: center;
     justify-content: center;
     font-size: 1.1em;
-    font-weight: normal;
+    font-weight: 300;
     color: white;
     text-shadow: none;
     cursor: pointer;
@@ -178,7 +178,7 @@ body {
     border: 1px solid #c8e6c9;
     overflow: hidden;
     align-items: flex-start;
-    padding-top: 8%;
+    padding-top: 12%;
 }
 
 .cell > * {
