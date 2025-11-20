@@ -64,7 +64,8 @@ io.on('connection', (socket) => {
                 2: { board: null, score: 0, timeRemaining: 120, gameActive: false, finished: false, timerInterval: null }
             },
             playerCount: 1,
-            bothFinished: false
+            bothFinished: false,
+            playAgainRequests: new Set() // Track who wants to play again
         });
         
         console.log(`Room created: ${roomId} by ${socket.id}`);
@@ -174,6 +175,9 @@ io.on('connection', (socket) => {
                         scores: scores,
                         winner: winner
                     });
+                    
+                    // Reset play-again requests when game ends
+                    game.playAgainRequests = new Set();
                 }
             }
         }, 1000);
@@ -220,6 +224,67 @@ io.on('connection', (socket) => {
         } else {
             // Invalid selection
             socket.emit('invalid-selection');
+        }
+    });
+
+    socket.on('play-again', ({ roomId, playerNumber }) => {
+        const game = games.get(roomId);
+        if (!game) {
+            socket.emit('play-again-error', 'Room not found');
+            return;
+        }
+        
+        // Add this player to play-again requests
+        game.playAgainRequests.add(playerNumber);
+        
+        // Notify other player that this player wants to play again
+        const otherPlayerNumber = playerNumber === 1 ? 2 : 1;
+        const otherPlayer = game.players.find(p => p.playerNumber === otherPlayerNumber);
+        if (otherPlayer) {
+            io.to(otherPlayer.id).emit('opponent-wants-play-again');
+        }
+        
+        // If both players want to play again, reset the game
+        if (game.playAgainRequests.size === 2) {
+            // Clear all timers
+            if (game.playerGames[1].timerInterval) {
+                clearInterval(game.playerGames[1].timerInterval);
+            }
+            if (game.playerGames[2].timerInterval) {
+                clearInterval(game.playerGames[2].timerInterval);
+            }
+            
+            // Generate new shared board
+            const newSharedBoard = generateBoard();
+            game.sharedBoard = newSharedBoard;
+            
+            // Reset player game states
+            game.playerGames[1] = {
+                board: null,
+                score: 0,
+                timeRemaining: 120,
+                gameActive: false,
+                finished: false,
+                timerInterval: null
+            };
+            game.playerGames[2] = {
+                board: null,
+                score: 0,
+                timeRemaining: 120,
+                gameActive: false,
+                finished: false,
+                timerInterval: null
+            };
+            
+            game.bothFinished = false;
+            game.playAgainRequests = new Set();
+            
+            // Notify both players that game is reset and ready
+            io.to(roomId).emit('game-reset', {
+                message: 'New game ready! Click Start Game when ready.'
+            });
+            
+            console.log(`Game reset in room ${roomId}`);
         }
     });
 

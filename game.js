@@ -210,6 +210,63 @@ class FruitBoxGame {
             this.gameActive = false;
             this.endGame(scores, winner);
         });
+        
+        this.socket.on('opponent-wants-play-again', () => {
+            // Update the play again button to show opponent is ready
+            if (this.playAgainBtn) {
+                const originalText = this.playAgainBtn.textContent;
+                this.playAgainBtn.textContent = 'Opponent Ready - Click to Play Again!';
+                this.playAgainBtn.style.backgroundColor = '#4caf50';
+                setTimeout(() => {
+                    if (this.playAgainBtn) {
+                        this.playAgainBtn.textContent = originalText;
+                        this.playAgainBtn.style.backgroundColor = '';
+                    }
+                }, 2000);
+            }
+        });
+        
+        this.socket.on('game-reset', ({ message }) => {
+            // Reset game state
+            this.gameActive = false;
+            this.finished = false;
+            this.opponentFinished = false;
+            this.board = [];
+            this.score = 0;
+            this.opponentScore = 0;
+            this.selectedCells.clear();
+            this.isSelecting = false;
+            this.selectionStart = null;
+            this.selectionEnd = null;
+            
+            // Hide game over modal
+            this.gameOverModal.classList.remove('show');
+            
+            // Clear the board display
+            this.gameBoard.innerHTML = '';
+            
+            // Reset scores and timer display
+            this.updateScores();
+            this.timerEl.textContent = '120';
+            this.timerEl.classList.remove('warning');
+            
+            // Show start button
+            this.startBtn.style.display = 'block';
+            
+            // Re-enable play again button
+            if (this.playAgainBtn) {
+                this.playAgainBtn.textContent = 'Play Again';
+                this.playAgainBtn.disabled = false;
+            }
+            
+            // Update player indicators
+            this.indicator1.textContent = this.playerNumber === 1 ? 'Your Turn' : 'Waiting';
+            this.indicator2.textContent = this.playerNumber === 2 ? 'Your Turn' : 'Waiting';
+            this.indicator1.classList.remove('active');
+            this.indicator2.classList.remove('active');
+            
+            console.log('Game reset:', message);
+        });
     }
     
     attachEventListeners() {
@@ -291,8 +348,21 @@ class FruitBoxGame {
         });
         
         this.playAgainBtn.addEventListener('click', () => {
-            this.gameOverModal.classList.remove('show');
-            this.resetToLobby();
+            if (this.roomId && this.playerNumber) {
+                // Emit play-again request to server
+                this.socket.emit('play-again', {
+                    roomId: this.roomId,
+                    playerNumber: this.playerNumber
+                });
+                
+                // Update button to show waiting state
+                this.playAgainBtn.textContent = 'Waiting for opponent...';
+                this.playAgainBtn.disabled = true;
+            } else {
+                // If no room, go back to lobby
+                this.gameOverModal.classList.remove('show');
+                this.resetToLobby();
+            }
         });
         
         // Mouse events for selection - attach to game board, not just cells
