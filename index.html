@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multiplayer Fruit Box</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+    <div id="lobbyModal" class="modal show">
+        <div class="modal-content">
+            <h2>🍎 Multiplayer Fruit Box 🍎</h2>
+            <div class="lobby-options">
+                <button id="createRoomBtn" class="btn btn-start">Create Room</button>
+                <div class="or-divider">OR</div>
+                <div class="join-section">
+                    <input type="text" id="roomIdInput" placeholder="Enter Room ID" maxlength="6" class="room-input">
+                    <button id="joinRoomBtn" class="btn btn-start">Join Room</button>
+                </div>
+            </div>
+            <div id="roomInfo" class="room-info" style="display: none;">
+                <p>Room ID: <strong id="displayRoomId"></strong></p>
+                <p>Share this link with your friend:</p>
+                <div class="share-link">
+                    <input type="text" id="shareLink" readonly class="room-input">
+                    <button id="copyLinkBtn" class="btn btn-reset">Copy</button>
+                </div>
+                <p id="waitingText">Waiting for player 2...</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="game-wrapper" style="display: none;">
+        <div class="top-bar">
+            <div class="player player1">
+                <div class="player-label">Player 1</div>
+                <div class="score-display">
+                    <span class="score-label">Score</span>
+                    <span class="score-value" id="score1">0</span>
+                </div>
+                <div class="player-indicator active" id="indicator1">Your Turn</div>
+            </div>
+            <div class="timer-display">
+                <div class="timer-value" id="timer">60</div>
+            </div>
+            <div class="player player2">
+                <div class="player-label">Player 2</div>
+                <div class="score-display">
+                    <span class="score-label">Score</span>
+                    <span class="score-value" id="score2">0</span>
+                </div>
+                <div class="player-indicator" id="indicator2">Waiting</div>
+            </div>
+        </div>
+
+        <div class="game-area">
+            <div id="gameBoard" class="game-board"></div>
+        </div>
+
+        <div class="bottom-controls">
+            <button id="startBtn" class="btn btn-start" style="display: none;">Start Game</button>
+            <div id="roomDisplay" class="room-display" style="display: none;">
+                <span>Room: <strong id="currentRoomId"></strong></span>
+            </div>
+        </div>
+
+        <div id="gameOverModal" class="modal">
+            <div class="modal-content">
+                <h2>Game Over!</h2>
+                <div id="winnerMessage"></div>
+                <button id="playAgainBtn" class="btn btn-start">Play Again</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="game.js"></script>
+</body>
+</html>
+
